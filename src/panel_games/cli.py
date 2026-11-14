@@ -1,10 +1,14 @@
-"""Command line: panel-games serve [--ddp HOST[:PORT]] [--target WxH] [--port 8090]."""
+"""Command line: panel-games serve [--ddp HOST[:PORT]] [--target WxH] [--port 8090] [--config FILE]."""
 
 import argparse
 import re
+import sys
 import time
+import tomllib
+from pathlib import Path
 
 from .ddp import PORT as DDP_PORT
+from . import games
 from .host import Host
 from .outputs import DDPOutput, ScreenOutput
 from .web import lan_urls, serve_in_thread
@@ -24,6 +28,19 @@ def endpoint(s: str) -> tuple[str, int]:
     return host, int(port)
 
 
+def load_config(path: Path | None) -> dict:
+    if path is None:
+        path = Path("panel-games.toml")
+        if not path.exists():
+            return {}
+    try:
+        conf = tomllib.loads(path.read_text())
+        games.check_config(conf)
+    except (OSError, tomllib.TOMLDecodeError, ValueError) as e:
+        sys.exit(f"panel-games: {path}: {e}")
+    return conf
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="panel-games")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -33,14 +50,16 @@ def main(argv=None):
                    help="output canvas WxH; games that do not fit are unavailable (default 768x128)")
     s.add_argument("--port", type=int, default=8090, help="web port (default 8090)")
     s.add_argument("--bind", default="0.0.0.0", help="web address to listen on (default all, LAN-open)")
+    s.add_argument("--config", type=Path, help="per-game settings, TOML (default: panel-games.toml if present)")
     s.add_argument("--fps", type=float, default=60, help="frames sent per second (default 60)")
     a = ap.parse_args(argv)
+    conf = load_config(a.config)
 
     screen = ScreenOutput()
     outputs = [screen]
     if a.ddp:
         outputs.append(DDPOutput(a.ddp[0], a.ddp[1], *a.target))
-    host = Host(outputs, a.target, a.fps)
+    host = Host(outputs, a.target, a.fps, conf)
     srv = serve_in_thread(host, a.bind, a.port, screen)
     port = srv.server_address[1]
     print(f"panel-games: target {a.target[0]}x{a.target[1]}"

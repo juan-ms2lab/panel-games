@@ -181,6 +181,9 @@ class ElBirdo:
                    "On a 64-pixel-tall display, drop into the underworld as skeleton birdo between fire columns.")
     max_players = 1
     size = [(768, 128), (768, 64), (768, 32)]
+    # screen bezel: the two 32-row strips with a 1/5-strip gap, full width, on a dark gradient so they stand out
+    bezel = {"strip_height": 32, "gap": 0.2, "colors": ["#1a1726", "#020203"], "pattern": "diagonal",
+             "pattern_size": 6, "pattern_light": 6}
     controls = "A (or Up) to flap, START to pause, Left / Right pick the starting stage"
     record = {"best": 0, "unlocked": 1}  # kept for the life of the server, shared by every game
 

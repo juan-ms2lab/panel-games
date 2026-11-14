@@ -1,0 +1,17 @@
+# Per-game settings for panel-games. Copy to panel-games.toml (read automatically) or pass --config FILE.
+# Tables: [default] applies to every game, [<game id>] to one (ids: see GET /api/games).
+
+[default.bezel]
+# aspect = "16:9"          # letterbox the screen output to a TV ratio with the bezel
+# ddp = false              # also fill the panels' unused area with the bezel
+
+[elbirdo]
+# size = [768, 64]         # force one canvas size (or a list of [w, h] in order of preference)
+
+[elbirdo.bezel]
+# strip_height = 32        # rows per physical strip
+# gap = 0.2                # gap between strips, fraction of strip_height
+# colors = ["#1a1726", "#020203"]
+# pattern = "diagonal"     # diagonal, checker, dots, none
+# pattern_size = 6
+# pattern_light = 6

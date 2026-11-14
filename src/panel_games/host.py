@@ -13,9 +13,10 @@ IDLE_SECONDS = 120  # a game with no button presses for this long ends and the o
 
 
 class Host:
-    def __init__(self, outputs, target=(768, 128), fps: float = 60):
+    def __init__(self, outputs, target=(768, 128), fps: float = 60, conf=None):
         self.outputs = list(outputs)
         self.target = tuple(target)
+        self.conf = conf or {}  # per-game settings from the config file (see games/__init__.py)
         self.frame_time = 1 / fps
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -24,15 +25,15 @@ class Host:
         self.error = None
 
     def catalog(self):
-        return games.catalog(self.target)
+        return games.catalog(self.target, self.conf)
 
     def start(self, game_id: str):
         cls = games.REGISTRY.get(game_id)
         if cls is None:
             raise ValueError(f"game must be one of {sorted(games.REGISTRY)}")
-        size = games.pick_size(cls, *self.target)
+        size = games.pick_size(cls, *self.target, self.conf)
         if size is None:
-            raise ValueError(f"{cls.title} needs {' or '.join(f'{w}x{h}' for w, h in games.sizes(cls))}; "
+            raise ValueError(f"{cls.title} needs {' or '.join(f'{w}x{h}' for w, h in games.sizes(cls, self.conf))}; "
                              f"the output is {self.target[0]}x{self.target[1]}")
         with self._lock:
             self._halt()
@@ -41,7 +42,7 @@ class Host:
             PAD.start(game_id, game.max_players)
             self.game = game
             stop = self._stop = threading.Event()
-            self._worker = threading.Thread(target=self._run, args=(game, size, stop), daemon=True)
+            self._worker = threading.Thread(target=self._run, args=(game, size, games.bezel(cls, self.conf), stop), daemon=True)
             self._worker.start()
 
     def stop(self):
@@ -54,7 +55,7 @@ class Host:
         if w and w is not threading.current_thread():
             w.join()
 
-    def _run(self, game, size, stop):
+    def _run(self, game, size, bezel, stop):
         canvas = np.zeros((size[1], size[0], 3), np.uint8)
         try:
             last, acc, shown = time.monotonic(), 0.0, 0.0
@@ -72,7 +73,7 @@ class Host:
                     shown = now
                     game.render(canvas)
                     for o in self.outputs:
-                        o.show(canvas)
+                        o.show(canvas, bezel)
                 if PAD.idle_seconds() > IDLE_SECONDS:
                     return
                 stop.wait(max(0.0, STEP - (time.monotonic() - now)))

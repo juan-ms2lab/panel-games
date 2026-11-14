@@ -2,7 +2,9 @@
 
 DDPOutput maps the game canvas onto a fixed target canvas: the largest whole-number nearest-neighbour upscale
 that fits, centered (scale 1 when it fits exactly). A game larger than the target is center-cropped, never
-shrunk; the catalog normally keeps such games from starting at all.
+shrunk; the catalog normally keeps such games from starting at all. Both outputs take the game's bezel
+settings (bezel.py): the screen shows strip gaps and letterboxing in bezel, DDP only fills its letterbox with it
+when the game's bezel says `ddp = true`.
 """
 
 import threading
@@ -10,11 +12,13 @@ import threading
 import cv2
 import numpy as np
 
+from . import bezel as bz
 from .ddp import PORT, DDPSender
 
 
-def fit(frame: np.ndarray, tw: int, th: int) -> np.ndarray:
-    """Place frame (h, w, 3) on a black (th, tw, 3) canvas: integer upscale, centered; crop if too big."""
+def fit(frame: np.ndarray, tw: int, th: int, bg: np.ndarray | None = None) -> np.ndarray:
+    """Place frame (h, w, 3) on a (th, tw, 3) canvas (black, or a copy of bg): integer upscale, centered;
+    crop if too big."""
     h, w = frame.shape[:2]
     s = max(1, min(tw // w, th // h))
     if s > 1:
@@ -24,7 +28,7 @@ def fit(frame: np.ndarray, tw: int, th: int) -> np.ndarray:
         frame, w = frame[:, (w - tw) // 2 : (w - tw) // 2 + tw], tw
     if h > th:
         frame, h = frame[(h - th) // 2 : (h - th) // 2 + th], th
-    out = np.zeros((th, tw, 3), np.uint8)
+    out = np.zeros((th, tw, 3), np.uint8) if bg is None else bg.copy()
     y, x = (th - h) // 2, (tw - w) // 2
     out[y : y + h, x : x + w] = frame
     return out
@@ -35,9 +39,10 @@ class DDPOutput:
         self.tw, self.th = target_w, target_h
         self.sender = DDPSender(host, port)
 
-    def show(self, frame: np.ndarray):
+    def show(self, frame: np.ndarray, bezel: dict | None = None):
+        bg = bz.fill(self.tw, self.th, bezel) if bezel and bezel["ddp"] else None
         try:
-            self.sender.send(fit(frame, self.tw, self.th).tobytes())
+            self.sender.send(fit(frame, self.tw, self.th, bg).tobytes())
         except OSError:
             pass  # receiver unreachable or network down: drop the frame, try again next one
 
@@ -54,7 +59,8 @@ class ScreenOutput:
         self.count = 0
         self._png = (-1, b"")
 
-    def show(self, frame: np.ndarray):
+    def show(self, frame: np.ndarray, bezel: dict | None = None):
+        frame = bz.compose(frame, bezel) if bezel else frame
         with self._lock:
             self.frame = frame.copy()
             self.count += 1

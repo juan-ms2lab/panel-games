@@ -30,6 +30,7 @@ Options (all optional):
 | `--port` | `8090` | web port |
 | `--bind` | `0.0.0.0` | web address (all interfaces) |
 | `--fps` | `60` | frames sent per second (game logic always steps at 60 Hz) |
+| `--config FILE` | `panel-games.toml` if present | per-game settings (size, bezel), see below |
 
 Without `--ddp` only the screen output runs.
 
@@ -46,6 +47,50 @@ the target by the sender: the largest whole-number nearest-neighbour upscale tha
 the sizes match). A game larger than the target is center-cropped, never shrunk, but in practice it cannot be
 started: the catalog marks it unavailable for that target. On 768x64 that leaves El Birdo; Austin's
 games all need 768x128.
+
+## Bezel
+
+The screen output draws a bezel: the graphic around and between the game's picture. It is generated (a vertical
+gradient plus a repeating pattern), so it fits any size:
+
+- **Strip gaps:** `strip_height` cuts the picture into strips of that many rows (the physical LED strip height)
+  with `gap * strip_height` rows of bezel between them, so the TV looks like the real strips. El Birdo uses
+  32-row strips, a 1/5 gap (6 rows) and full width on a dark gradient, so a 768x64 game shows as 768x70.
+- **Letterboxing:** `aspect = "16:9"` pads the screen frame with bezel to that ratio instead of black bars.
+- **On the panels:** strip gaps are never sent by DDP (the real strips have their own). With `ddp = true` the
+  bezel also fills the unused area when a game is smaller than `--target`; by default that area is black.
+
+| setting | default | |
+|---|---|---|
+| `strip_height` | `0` (one piece) | rows per strip |
+| `gap` | `0.2` | gap between strips, as a fraction of `strip_height` |
+| `aspect` | none | screen ratio to letterbox to, e.g. `"16:9"` |
+| `ddp` | `false` | fill the DDP letterbox with bezel too |
+| `colors` | `["#202028", "#08080c"]` | gradient top and bottom |
+| `pattern` | `diagonal` | `diagonal`, `checker`, `dots` or `none` |
+| `pattern_size` | `8` | pixels per pattern cell |
+| `pattern_light` | `10` | how much brighter (0-255) the pattern cells are |
+
+A game sets its own defaults with a `bezel = {...}` class attribute.
+
+## Per-game config
+
+`--config FILE` (or `panel-games.toml` in the working directory) is TOML with one table per game id plus
+`default` for all games. Precedence: built-in defaults, then `[default.bezel]`, then the game's own `bezel`,
+then `[<id>.bezel]`. `size` restricts which canvas size a game is built at. Unknown games or settings stop the
+server with an error. See `panel-games.example.toml`:
+
+```toml
+[default.bezel]
+aspect = "16:9"            # letterbox every game on the TV
+
+[elbirdo]
+size = [768, 64]           # always the two-strip version
+
+[elbirdo.bezel]
+colors = ["#141022", "#000000"]
+pattern = "dots"
+```
 
 ## Games
 
@@ -113,6 +158,7 @@ class MyGame:
     max_players = 4
     controls = "Up / Down to move, A to fire"
     size = (768, 128)            # or a list in order of preference: [(768, 64), (768, 32)]
+    bezel = {"strip_height": 32}  # optional screen bezel defaults (see Bezel)
 
     def __init__(self, width, height, seed=None): ...   # built at the chosen size
     def update(self, dt, pads): ...                     # fixed 1/60 s steps
@@ -171,6 +217,7 @@ matters on your network.
 |---|---|
 | `cli.py` | `panel-games serve` |
 | `host.py` | runs one game at a time on a fixed-rate loop thread, idle timeout, pushes frames to the outputs |
+| `bezel.py` | generated bezel: strip gaps, letterboxing, gradient and pattern |
 | `outputs.py` | `DDPOutput` (maps the game canvas onto the target and sends it), `ScreenOutput` (latest frame for `/screen`) |
 | `ddp.py` | ~30-line DDP sender (1440-byte packets, PUSH on the last) |
 | `web.py` | HTTP server, rate limiter |

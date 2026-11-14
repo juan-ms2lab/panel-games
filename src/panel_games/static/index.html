@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Games</title>
+<style>
+  :root { --bg:#14161a; --panel:#1e2127; --line:#2c3038; --fg:#e6e8eb; --dim:#8b929c; --acc:#4da3ff; --bad:#ff5d5d; --ok:#2e9e5b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  h1 { font-size:16px; margin:0; }
+  h3 { margin:18px 0 6px; }
+  #status { color:var(--dim); flex:1; min-width:180px; }
+  #status.err { color:var(--bad); }
+  main { padding:16px; max-width:1100px; margin:0 auto; }
+  #preview { width:100%; min-height:40px; image-rendering:pixelated; background:#000; border:1px solid var(--line); display:block; }
+  button, select, input { font:inherit; color:var(--fg); background:#2a2e36; border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+  button { cursor:pointer; } button:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); color:#04121f; border-color:var(--acc); }
+  button.danger { color:var(--bad); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); color:#fff; padding:8px 14px; border-radius:6px; display:none; max-width:90vw; z-index:5; }
+  label { color:var(--dim); }
+  .note { color:var(--dim); margin:4px 0; }
+  #screenLink { color:var(--acc); }
+  .card.off { opacity:0.5; }
+  #padUi { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:12px 0; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:none; }
+  #dpad { display:grid; grid-template-columns:repeat(3, 1fr); grid-template-rows:repeat(3, 1fr); gap:6px; width:min(46vw, 260px); height:min(46vw, 260px); }
+  #dpad .up { grid-column:2; grid-row:1; } #dpad .left { grid-column:1; grid-row:2; }
+  #dpad .right { grid-column:3; grid-row:2; } #dpad .down { grid-column:2; grid-row:3; }
+  .pb { font-size:26px; border-radius:14px; background:#2f3540; touch-action:none; user-select:none; -webkit-user-select:none; padding:0; }
+  .pb.on { background:var(--acc); color:#04121f; }
+  #abtns { display:flex; gap:16px; align-items:center; }
+  #abtns .pb { width:min(24vw, 120px); height:min(24vw, 120px); border-radius:50%; font-size:30px; }
+  .swatch { display:inline-block; width:14px; height:14px; border-radius:50%; vertical-align:middle; margin-right:6px; }
+  #quizArrows { display:flex; gap:8px; justify-content:center; margin:8px 0; }
+  #quizArrows .pb { width:64px; height:48px; font-size:20px; }
+  #quiz { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:6px 0; }
+  #quiz .pb { height:min(26vh, 150px); font-size:44px; color:#fff; border:0; }
+  #quiz .q0 { background:#dc3232; } #quiz .q1 { background:#2864f0; }
+  #quiz .q2 { background:#e0b400; color:#222; } #quiz .q3 { background:#28aa50; }
+  #quiz .pb.on { filter:brightness(1.5); outline:4px solid #fff; }
+  #sketchInfo { text-align:center; margin:6px 0; font-size:18px; }
+  #sketchInfo b { font-size:26px; letter-spacing:3px; }
+  #drawCv { width:100%; aspect-ratio:560/128; background:#0e0e1c; border-radius:8px; touch-action:none; display:block; }
+  #drawTools { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:8px 0; touch-action:manipulation; }
+  #drawTools .sw { width:38px; height:38px; border-radius:50%; border:3px solid transparent; padding:0; }
+  #drawTools .sw.sel { border-color:#fff; }
+  #drawTools .er { background:#0e0e1c; color:#fff; border:3px solid #556; }
+  #guessRow { display:flex; gap:8px; margin:8px 0; }
+  #guessRow input { flex:1; font-size:18px; }
+  #guessLog { list-style:none; padding:0; margin:6px 0; }
+  #guessLog li { padding:4px 8px; border-radius:6px; margin:3px 0; background:#2a2f3a; }
+  #guessLog li.close { background:#6b5a10; } #guessLog li.correct { background:#1f6b3a; }
+  #tugInfo { text-align:center; margin:6px 0; font-size:20px; min-height:56px; }
+  #tugInfo b { font-size:28px; }
+  #tugBtn { width:100%; height:min(46vh, 320px); border-radius:20px; border:0; font-size:48px; color:#fff; background:#445; touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  #tugBtn.live:active { filter:brightness(1.5); transform:scale(0.98); }
+  #tugArrows { display:flex; gap:8px; justify-content:center; align-items:center; margin:8px 0; }
+  #tugArrows .pb { width:56px; height:44px; font-size:18px; }
+  #airInfo { text-align:center; margin:6px 0; font-size:20px; min-height:30px; }
+  #airPad { position:relative; width:100%; height:min(44vh, 300px); border-radius:16px; border:3px solid #556; background:#0e1228; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #airDot { position:absolute; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:50%; background:#fff; opacity:0.85; pointer-events:none; left:50%; top:50%; }
+  #airArrows { display:flex; gap:8px; justify-content:center; align-items:center; margin:8px 0; }
+  #airArrows .pb { width:64px; height:44px; font-size:18px; }
+  #padStart { width:min(60vw, 260px); height:56px; font-size:20px; border-radius:28px; margin:6px 0; }
+  #padHint { color:var(--fg); }
+  @media (max-width: 640px) {
+    main { padding:10px; } button, select, input { padding:10px 12px; font-size:16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Panel Games</h1>
+  <div id="status">connecting...</div>
+  <a id="screenLink" href="/screen" target="_blank">Open the screen</a>
+  <button id="stop" class="danger">Stop game</button>
+</header>
+<main>
+  <section id="tab-games" style="display:block">
+    <p id="gameBanner" class="note"></p>
+    <div class="grid" id="gameList"></div>
+    <div id="pad" style="display:none">
+      <div class="row"><b id="padTitle"></b><span id="padInfo" class="note"></span><button id="padLeave">Leave game</button></div>
+      <div id="padUi">
+        <div id="dpad">
+          <button class="pb up" data-key="4">&#9650;</button>
+          <button class="pb left" data-key="1">&#9664;</button>
+          <button class="pb right" data-key="2">&#9654;</button>
+          <button class="pb down" data-key="8">&#9660;</button>
+        </div>
+        <div id="abtns">
+          <button class="pb" data-key="32">B</button>
+          <button class="pb" data-key="16">A</button>
+        </div>
+      </div>
+      <div id="quizUi" style="display:none">
+        <div id="quizArrows">
+          <button class="pb" data-key="1">&#9664;</button>
+          <button class="pb" data-key="2">&#9654;</button>
+          <button class="pb" data-key="4">&#9650;</button>
+          <button class="pb" data-key="8">&#9660;</button>
+        </div>
+        <div id="quiz">
+          <button class="pb q0" data-key="16">A</button>
+          <button class="pb q1" data-key="32">B</button>
+          <button class="pb q2" data-key="128">C</button>
+          <button class="pb q3" data-key="256">D</button>
+        </div>
+      </div>
+      <div id="sketchUi" style="display:none">
+        <div id="sketchInfo"></div>
+        <div id="sketchArrows" class="row" style="justify-content:center; display:none">
+          <button class="pb" data-key="8" style="width:64px;height:48px;font-size:20px">&#9660;</button>
+          <span class="note">rounds each</span>
+          <button class="pb" data-key="4" style="width:64px;height:48px;font-size:20px">&#9650;</button>
+        </div>
+        <div id="drawPane" style="display:none">
+          <canvas id="drawCv" width="560" height="128"></canvas>
+          <div id="drawTools"></div>
+          <p class="note" style="text-align:center">Tip: turn your phone sideways for more room.</p>
+        </div>
+        <div id="guessPane" style="display:none">
+          <div id="guessRow"><input id="guessIn" maxlength="40" autocomplete="off" autocapitalize="off" placeholder="Type your guess"><button class="primary" id="guessGo">Guess</button></div>
+          <ul id="guessLog"></ul>
+        </div>
+      </div>
+      <div id="tugUi" style="display:none">
+        <div id="tugInfo"></div>
+        <div id="tugArrows" style="display:none">
+          <button class="pb" data-key="1">&#9664;</button><span class="note">rounds</span><button class="pb" data-key="2">&#9654;</button>
+          <span style="width:16px"></span>
+          <button class="pb" data-key="8">&#9660;</button><span class="note">seconds</span><button class="pb" data-key="4">&#9650;</button>
+        </div>
+        <button id="tugBtn">TAP</button>
+      </div>
+      <div id="airUi" style="display:none">
+        <div id="airInfo"></div>
+        <div id="airArrows" style="display:none">
+          <button class="pb" data-key="8">&#9660;</button><span class="note">goals to win</span><button class="pb" data-key="4">&#9650;</button>
+        </div>
+        <div id="airPad"><div id="airDot"></div></div>
+      </div>
+      <div class="row" style="justify-content:center"><button class="pb" id="padStart" data-key="64">START</button></div>
+      <p id="padHint"></p>
+      <p class="note" id="padHelp"></p>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function el(tag, props = {}, ...kids) {
+  const e = Object.assign(document.createElement(tag), props);
+  for (const k of kids) e.append(k);
+  return e;
+}
+let toastTimer;
+function toast(msg, ok = false) {
+  const t = $('#toast'); t.textContent = msg; t.style.display = 'block';
+  t.style.background = ok ? 'var(--ok)' : 'var(--bad)';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.style.display = 'none'), 3000);
+}
+async function api(path, opts = {}) {
+  let r;
+  try {
+    r = await fetch(path, { ...opts, headers: { 'X-Requested-With': 'panel-games', ...(opts.headers || {}) } });
+  } catch (e) {
+    throw new Error('Cannot reach the control panel server. Check that it is running and that this page was opened from its address.');
+  }
+  const isJson = (r.headers.get('content-type') || '').includes('json');
+  const body = isJson ? await r.json() : null;
+  if (!r.ok) { const err = new Error((body && body.error) || r.statusText); err.status = r.status; throw err; }
+  return body;
+}
+const post = (p, b) => api(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+const fail = (e) => toast(e.message);
+
+// ---- games
+const HERO_COLORS = ['#00c8ff', '#ff8c00', '#78ff3c', '#ff3cc8', '#ffeb00', '#ff5050', '#a06eff', '#ebebeb'];
+let gameCatalog = [], pad = { token: null, slot: null, keys: 0, timer: null, title: '' };
+async function loadGames() {
+  try { gameCatalog = await api('/api/games'); } catch (e) { return fail(e); }
+  const box = $('#gameList'); box.replaceChildren();
+  for (const g of gameCatalog) {
+    box.append(el('div', { className: 'card' + (g.available ? '' : ' off') },
+      el('h3', { textContent: g.title, style: 'margin:4px 0' }),
+      el('div', { className: 'note', textContent: g.description }),
+      el('div', { className: 'note', textContent: 'Players: up to ' + g.max_players + '. Controls: ' + g.controls }),
+      el('div', { className: 'row' }, g.available
+        ? el('button', { className: 'primary', textContent: 'Play', onclick: () => startGame(g) })
+        : el('span', { className: 'note', textContent: 'Needs ' + g.sizes.join(' or ') + ', not available on this display' }))));
+  }
+}
+async function startGame(g) {
+  try { await post('/api/game/start', { id: g.id }); await joinGame(); } catch (e) { fail(e); }
+}
+async function joinGame() {
+  try {
+    if (!gameCatalog.length) await loadGames();
+    const r = await post('/api/game/join', {});
+    pad.token = r.token; pad.slot = r.slot; pad.keys = 0;
+    pad.title = r.game ? r.game.title : '';
+    clearInterval(pad.timer); pad.timer = setInterval(sendKeys, 300);
+    showPad();
+  } catch (e) { fail(e); }
+}
+function showPad() {
+  const g = gameCatalog.find((x) => x.title === pad.title);
+  $('#padTitle').replaceChildren(el('span', { className: 'swatch', style: 'background:' + HERO_COLORS[pad.slot % 8] }), 'Player ' + (pad.slot + 1) + ': ' + pad.title);
+  $('#padHelp').textContent = g ? g.controls : '';
+  const quiz = g && g.layout === 'quiz', sketch = g && g.layout === 'sketch', tug = g && g.layout === 'tug', air = g && g.layout === 'air';
+  pad.layout = g ? g.layout : 'dpad';
+  $('#padUi').style.display = quiz || sketch || tug || air ? 'none' : '';
+  $('#quizUi').style.display = quiz ? '' : 'none';
+  $('#sketchUi').style.display = sketch ? '' : 'none';
+  $('#tugUi').style.display = tug ? '' : 'none';
+  $('#airUi').style.display = air ? '' : 'none';
+  clearInterval(sk.poll); clearInterval(tg.send); clearInterval(ag.send); sk.turn = null;
+  if (sketch || tug || air) { sk.poll = setInterval(pollSketch, tug ? 300 : 500); pollSketch(); }
+  if (tug) tg.send = setInterval(sendTaps, 80);
+  if (air) ag.send = setInterval(sendMove, 33);
+  $('#pad').style.display = ''; $('#gameList').style.display = 'none';
+}
+
+// ---- sketch (drawing and guessing)
+const SK_COLORS = ['#ffffff', '#ff3c3c', '#ff961e', '#ffe628', '#3cdc5a', '#28d2ff', '#466eff', '#f050dc'];
+const sk = { poll: null, turn: null, color: 1, size: 5, busy: false, queue: [], cur: null, last: null, flush: null, role: 'wait', drawing: false };
+const drawCv = $('#drawCv'), dctx = drawCv.getContext('2d');
+dctx.lineCap = 'round'; dctx.lineJoin = 'round';
+function clearDrawing() { dctx.fillStyle = '#0e0e1c'; dctx.fillRect(0, 0, 560, 128); }
+clearDrawing();
+(function buildTools() {
+  const box = $('#drawTools');
+  SK_COLORS.forEach((c, i) => box.append(el('button', { className: 'sw' + (i === sk.color ? ' sel' : ''), style: 'background:' + c, onclick: () => pickTool(i) })));
+  box.append(el('button', { className: 'sw er', textContent: 'E', onclick: () => pickTool(8) }));
+  box.append(el('button', { textContent: 'Thin', onclick: () => { sk.size = 3; } }));
+  box.append(el('button', { textContent: 'Thick', onclick: () => { sk.size = 9; } }));
+  box.append(el('button', { textContent: 'Clear', onclick: () => { clearDrawing(); sendOps([{ clear: true }]); } }));
+})();
+function pickTool(i) {
+  sk.color = i;
+  $$('#drawTools .sw').forEach((b, j) => b.classList.toggle('sel', j === i));
+}
+function sendOps(ops) {
+  if (pad.token && ops.length) post('/api/game/message', { token: pad.token, data: { t: 'draw', ops } }).catch(() => {});
+}
+function strokeStyle(c, s) { return { c, s: c === 8 ? s * 2 : s }; }
+function inkLine(a, b, c, s) {
+  dctx.strokeStyle = c === 8 ? '#0e0e1c' : SK_COLORS[c]; dctx.fillStyle = dctx.strokeStyle; dctx.lineWidth = s;
+  dctx.beginPath(); dctx.moveTo(a[0], a[1]); dctx.lineTo(b[0], b[1]); dctx.stroke();
+  dctx.beginPath(); dctx.arc(b[0], b[1], s / 2, 0, 7); dctx.fill();
+}
+function canvasPoint(e) {
+  const r = drawCv.getBoundingClientRect();
+  return [Math.round((e.clientX - r.left) * 560 / r.width), Math.round((e.clientY - r.top) * 128 / r.height)];
+}
+function flushStroke() {
+  if (!sk.cur || (sk.cur.p.length < 2 && sk.sent)) return;
+  const op = sk.cur; sendOps([op]); sk.sent = true;
+  sk.cur = { c: op.c, s: op.s, p: [op.p[op.p.length - 1]] };
+}
+drawCv.onpointerdown = (e) => {
+  if (sk.role !== 'drawer') return;
+  e.preventDefault(); drawCv.setPointerCapture(e.pointerId);
+  const st = strokeStyle(sk.color, sk.size), p = canvasPoint(e);
+  sk.drawing = true; sk.sent = false; sk.last = p; sk.cur = { c: st.c, s: st.s, p: [p] };
+  inkLine(p, p, st.c, st.s);
+  clearInterval(sk.flush); sk.flush = setInterval(flushStroke, 60);
+};
+drawCv.onpointermove = (e) => {
+  if (!sk.drawing) return;
+  const p = canvasPoint(e);
+  inkLine(sk.last, p, sk.cur.c, sk.cur.s); sk.last = p;
+  if (sk.cur.p.length < 280) sk.cur.p.push(p);
+};
+const endStroke = () => {
+  if (!sk.drawing) return;
+  sk.drawing = false; clearInterval(sk.flush);
+  flushStroke(); sk.cur = null;
+};
+drawCv.onpointerup = endStroke; drawCv.onpointercancel = endStroke;
+async function pollSketch() {
+  if (!pad.token || sk.busy) return;
+  sk.busy = true;
+  try { const s = await post('/api/game/state', { token: pad.token }); (({ tug: renderTug, air: renderAir })[pad.layout] || renderSketch)(s); }
+  catch (e) { if (e.status === 400) padLost('You were removed from the game. Join again.'); }
+  finally { sk.busy = false; }
+}
+function renderSketch(s) {
+  const key = s.state === 'intro' || s.state === 'draw' ? s.turn + ':' + s.drawer : null;
+  if (s.state === 'intro' && sk.turn !== key) { clearDrawing(); sk.turn = key; }
+  sk.role = s.state === 'draw' ? s.role : 'wait';
+  const inLobby = s.state === 'lobby';
+  $('#sketchArrows').style.display = inLobby && s.host === pad.slot ? '' : 'none';
+  $('#drawPane').style.display = (s.role === 'drawer' && (s.state === 'draw' || s.state === 'intro')) ? '' : 'none';
+  $('#guessPane').style.display = (s.role === 'guesser' && s.state === 'draw') ? '' : 'none';
+  const info = $('#sketchInfo'); info.replaceChildren();
+  const line = (t) => info.append(el('div', { textContent: t }));
+  if (inLobby) { line('Each player draws ' + s.cycles + ' time' + (s.cycles > 1 ? 's' : '') + '.'); }
+  else if (s.state === 'intro') { line(s.role === 'drawer' ? 'You are drawing!' : 'Get ready to guess.'); if (s.role === 'drawer') info.append(el('b', { textContent: (s.word || '').toUpperCase() })); }
+  else if (s.state === 'draw') {
+    line((s.remaining != null ? s.remaining + 's' : '') + '   Score ' + s.score);
+    if (s.role === 'drawer') { line('Draw this:'); info.append(el('b', { textContent: (s.word || '').toUpperCase() })); }
+    else if (s.solved) line('Correct! Wait for the others.');
+    else info.append(el('b', { textContent: (s.hint || '').split('').join(' ') }));
+  }
+  else if (s.state === 'reveal') { line('The word was'); info.append(el('b', { textContent: (s.word || '').toUpperCase() })); line('Score ' + s.score); }
+  else if (s.state === 'over') line('Game over. Final score ' + s.score);
+  const log = $('#guessLog'); log.replaceChildren();
+  for (const [g, st] of [...(s.feedback || [])].reverse()) log.append(el('li', { className: st, textContent: g + (st === 'close' ? '  (so close!)' : st === 'correct' ? '  (correct!)' : '') }));
+}
+function sendGuess() {
+  const inp = $('#guessIn'), text = inp.value.trim();
+  if (!text || !pad.token) return;
+  inp.value = '';
+  post('/api/game/message', { token: pad.token, data: { t: 'guess', text } }).then(pollSketch).catch(() => {});
+}
+$('#guessGo').onclick = sendGuess;
+$('#guessIn').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); sendGuess(); } };
+
+// ---- tug of war
+const TUG_TEAMS = [['RED', '#e03c3c'], ['BLUE', '#3c78e8']];
+const tg = { send: null, count: 0, live: false };
+function sendTaps() {
+  if (!pad.token || !tg.count) return;
+  const n = Math.min(tg.count, 8); tg.count -= n;
+  post('/api/game/message', { token: pad.token, data: { t: 'tap', n } }).catch(() => {});
+}
+$('#tugBtn').onpointerdown = (e) => {
+  e.preventDefault();
+  if (!tg.live) return;
+  tg.count = Math.min(tg.count + 1, 40);
+  if (navigator.vibrate) navigator.vibrate(8);
+};
+$('#tugBtn').oncontextmenu = (e) => e.preventDefault();
+function renderTug(s) {
+  const team = s.team, name = team == null ? null : TUG_TEAMS[team][0];
+  tg.live = s.state === 'pull' && team != null;
+  if (!tg.live) tg.count = 0;
+  $('#tugArrows').style.display = s.state === 'lobby' && s.host === pad.slot ? '' : 'none';
+  const btn = $('#tugBtn'); btn.classList.toggle('live', tg.live);
+  btn.style.background = tg.live ? TUG_TEAMS[team][1] : '#445';
+  const info = $('#tugInfo'); info.replaceChildren();
+  const line = (t) => info.append(el('div', { textContent: t }));
+  let label = 'WAIT';
+  if (s.state === 'lobby') { line('Best of ' + s.best_of + ', ' + s.secs + ' seconds a round.'); line('Teams are picked when the host starts.'); }
+  else if (team == null) { line('A game is in progress.'); line('You can play the next one.'); }
+  else if (s.state === 'ready') { line('You are on team ' + name); info.append(el('b', { textContent: 'Get ready: ' + s.countdown })); }
+  else if (s.state === 'pull') { label = 'TAP!'; line(name + ' team   ' + s.remaining + 's' + (s.overtime ? '  OVERTIME' : '')); line('Your taps: ' + s.taps); }
+  else if (s.state === 'round_end') { line(TUG_TEAMS[s.winner][0] + ' wins the round'); line(s.winner === team ? 'Nice pulling!' : 'Next round, harder!'); }
+  else if (s.state === 'over') { line(TUG_TEAMS[s.winner][0] + ' wins the match'); line('Your total taps: ' + s.total); }
+  btn.textContent = label;
+}
+// ---- air hockey
+const ag = { send: null, u: 0.5, v: 0.5, sent: null, down: false };
+function sendMove() {
+  if (!pad.token || !ag.down) return;
+  const key = ag.u + ',' + ag.v;
+  if (key === ag.sent) return;
+  ag.sent = key;
+  post('/api/game/message', { token: pad.token, data: { t: 'move', x: ag.u, y: ag.v } }).catch(() => {});
+}
+function airMove(e) {
+  const r = $('#airPad').getBoundingClientRect();
+  ag.u = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); ag.v = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  const dot = $('#airDot'); dot.style.left = (ag.u * 100) + '%'; dot.style.top = (ag.v * 100) + '%';
+}
+$('#airPad').onpointerdown = (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); ag.down = true; airMove(e); };
+$('#airPad').onpointermove = (e) => { if (ag.down) airMove(e); };
+$('#airPad').onpointerup = $('#airPad').onpointercancel = () => { ag.down = false; };
+$('#airPad').oncontextmenu = (e) => e.preventDefault();
+const AIR_TEAMS = [['LEFT', '#00c8ff'], ['RIGHT', '#ff8c00']];
+function renderAir(s) {
+  const [name, color] = AIR_TEAMS[s.team];
+  $('#airArrows').style.display = s.state === 'lobby' && s.host === pad.slot ? '' : 'none';
+  $('#airDot').style.background = color;
+  $('#airPad').style.borderColor = color;
+  const info = $('#airInfo'); info.replaceChildren();
+  info.append(el('div', { textContent: 'You defend the ' + name + ' goal. Slide your finger on the pad.' }));
+  info.append(el('div', { className: 'note', textContent: s.state === 'lobby' ? 'First to ' + s.to_win + ' goals.' : s.scores[0] + ' - ' + s.scores[1] + (s.state === 'over' ? '  ' + AIR_TEAMS[s.winner][0] + ' wins' : '') }));
+}
+function padLost(msg) {
+  clearInterval(ag.send); clearInterval(tg.send); tg.count = 0; tg.live = false;
+  clearInterval(sk.poll); clearInterval(pad.timer); pad.token = null; pad.keys = 0;
+  for (const b of $$('.pb')) b.classList.remove('on');
+  $('#pad').style.display = 'none'; $('#gameList').style.display = '';
+  if (msg) toast(msg);
+}
+function sendKeys() {
+  if (!pad.token) return;
+  post('/api/game/input', { token: pad.token, keys: pad.keys }).catch((e) => { if (e.status === 400) padLost('You were removed from the game. Join again.'); });
+}
+for (const b of $$('.pb')) {
+  const bit = +b.dataset.key;
+  b.onpointerdown = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); pad.keys |= bit; b.classList.add('on'); sendKeys(); };
+  const up = () => { pad.keys &= ~bit; b.classList.remove('on'); sendKeys(); };
+  b.onpointerup = up; b.onpointercancel = up; b.oncontextmenu = (e) => e.preventDefault();
+}
+$('#padLeave').onclick = () => { const t = pad.token; padLost(); if (t) post('/api/game/leave', { token: t }).catch(() => {}); };
+function updateGames(g) {
+  const banner = $('#gameBanner');
+  if (pad.token && !g) padLost('The game ended.');
+  if (!g) { banner.textContent = ''; return; }
+  if (pad.token) {
+    banner.textContent = '';
+    $('#padInfo').textContent = ' ' + g.joined + ' of ' + g.max_players + ' players';
+    $('#padHint').textContent = g.state !== 'lobby' || g.host == null ? '' : g.host === pad.slot
+      ? 'You are the host. Press START when everyone has joined.'
+      : 'Waiting for Player ' + (g.host + 1) + ' (the host) to press START.';
+    return;
+  }
+  banner.replaceChildren('Now playing: ' + g.title + ' (' + g.joined + ' of ' + g.max_players + ' players). ',
+    g.joined < g.max_players ? el('button', { className: 'primary', textContent: 'Join this game', onclick: joinGame }) : 'It is full.');
+}
+
+
+// ---- status polling
+async function refresh() {
+  try {
+    const s = await api('/api/status');
+    const st = $('#status'); st.classList.toggle('err', !!s.error);
+    st.textContent = s.error ? 'Error: ' + s.error : s.game ? 'Playing: ' + s.game.title : 'No game running (target ' + s.target + ')';
+    updateGames(s.game);
+  } catch (e) { $('#status').textContent = e.message; }
+}
+$('#stop').onclick = () => post('/api/game/stop', {}).then(refresh).catch(fail);
+loadGames(); refresh(); setInterval(refresh, 1000);
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ them in order of preference. The host builds the game at the first size that fit
 from .bomber import Bombers
 from .chomp import Chomp
 from .flap import Flap
+from .elbirdo import ElBirdo
 from .hockey import Hockey
 from .hop import Hop
 from .pad import PAD
@@ -17,7 +18,7 @@ from .sweep import Sweep
 from .trivia import Trivia
 from .tug import Tug
 
-REGISTRY = {g.id: g for g in (Platformer, Hop, Flap, Chomp, Bombers, Sweep, Trivia, Sketch, Tug, Hockey, Pong)}
+REGISTRY = {g.id: g for g in (Platformer, Hop, Flap, ElBirdo, Chomp, Bombers, Sweep, Trivia, Sketch, Tug, Hockey, Pong)}
 
 
 def sizes(game) -> list[tuple[int, int]]:

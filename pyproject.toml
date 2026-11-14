@@ -1,0 +1,27 @@
+[project]
+name = "panel-games"
+version = "0.1.0"
+description = "Multiplayer LED panel games with phones as controllers, rendered to DDP or a browser screen"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "opencv-python-headless",
+]
+
+[project.scripts]
+panel-games = "panel_games.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/panel_games"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]

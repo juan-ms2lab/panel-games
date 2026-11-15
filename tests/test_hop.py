@@ -11,8 +11,8 @@ ACTIONS = [(1, 0), (0, -1), (0, 1), (0, 0), (-1, 0)]
 KEY = {(1, 0): pad.RIGHT, (-1, 0): pad.LEFT, (0, -1): pad.UP, (0, 1): pad.DOWN, (0, 0): 0}
 
 
-def start_hop(slots=(0,), seed=1):
-    g = begin(hop.Hop(768, 128, seed=seed), slots)
+def start_hop(slots=(0,), seed=1, height=128):
+    g = begin(hop.Hop(768, height, seed=seed), slots)
     assert g.state == "play"
     for h in g.hoppers.values():
         h.invuln = 0.0
@@ -285,9 +285,9 @@ def step(g, col, y, t, a):
         ok, v = ok_at(g, col, y, t)
         y2 = y + v * STEP
         ok2, _ = ok_at(g, col, y2, t2)
-        return (col, y2, t2) if ok and ok2 and -0.3 <= y2 <= hop.GH - 0.7 else None
+        return (col, y2, t2) if ok and ok2 and -0.3 <= y2 <= g.gh - 0.7 else None
     col2, y2 = col + dx, y + dy
-    if not (0 <= col2 < hop.GW and 0 <= y2 <= hop.GH - 1):
+    if not (0 <= col2 < hop.GW and 0 <= y2 <= g.gh - 1):
         return None
     for frac in (0.0, 0.2, 0.4, 0.6, 0.8, 1.0):  # the body overlaps both lanes while hopping
         x, ym, tm = col + dx * frac, y + dy * frac, t + hop.HOP_T * frac
@@ -307,9 +307,10 @@ import os
 SEEDS = [1, 2, 3, 4, 5] if os.environ.get("LED_SLOW_TESTS") else [5]  # each seed takes 15-25 s
 
 
+@pytest.mark.parametrize("height", [128, 64])
 @pytest.mark.parametrize("seed", SEEDS)
-def test_a_lookahead_bot_can_cross_every_biome(seed):
-    g = start_hop(seed=seed)
+def test_a_lookahead_bot_can_cross_every_biome(seed, height):
+    g = start_hop(seed=seed, height=height)
     h = g.hoppers[0]
     for _ in range(int(hop.TIME_LIMIT / DT)):
         if g.state != "play":
@@ -318,4 +319,4 @@ def test_a_lookahead_bot_can_cross_every_biome(seed):
             g.update(DT, pads_for(s0=KEY[bot_action(g, h)]))
         else:
             g.update(DT, pads_for(s0=0))
-    assert h.finished, f"seed {seed}: reached column {h.max_col} with {h.lives} lives left"
+    assert h.finished, f"seed {seed}, {height} tall: reached column {h.max_col} with {h.lives} lives left"

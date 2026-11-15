@@ -84,25 +84,28 @@ def advance(e: Mover, dist: float, choose):
 
 
 def draw_podium(canvas: np.ndarray, ranking: list, t: float):
-    """ranking is [(slot, score), ...] best first; draws the top three."""
+    """ranking is [(slot, score), ...] best first; draws the top three. Laid out for 128 rows, scaled to fit."""
     h, w = canvas.shape[:2]
+    k = min(1.0, h / 128)
     canvas[:] = (10, 8, 30)
     for i in range(70):
         x, y = (i * 97 + int(t * 10) * (i % 3)) % w, int(t * 45 + i * 37) % h
         canvas[y : y + 2, x : x + 2] = PLAYER_COLORS[i % 8]
-    center_text(canvas, "PODIUM", 18, 0.7, (255, 230, 0), box=False)
+    center_text(canvas, "PODIUM", int(18 * k), 0.7 * k, (255, 230, 0), box=False)
+    floor = int(122 * k)
     for place, cx, bh, color in ((0, w // 2, 56, (255, 200, 0)), (1, w // 2 - 130, 40, (205, 205, 215)),
                                   (2, w // 2 + 130, 26, (205, 127, 50))):
         if place >= len(ranking):
             continue
         slot, score = ranking[place]
-        top = 122 - bh
-        canvas[top:122, cx - 50 : cx + 50] = color
-        text(canvas, str(place + 1), cx - 6, top + min(bh - 4, 26), 0.9, (30, 30, 30), 2)
-        cv2.circle(canvas, (cx, top - 10), 6, PLAYER_COLORS[slot], -1)
+        bh = int(bh * k)
+        top = floor - bh
+        canvas[top:floor, cx - 50 : cx + 50] = color
+        text(canvas, str(place + 1), cx - int(6 * k), top + min(bh - 2, int(26 * k)), 0.9 * k, (30, 30, 30), 2 if k == 1 else 1)
+        cv2.circle(canvas, (cx, top - int(10 * k)), max(2, int(6 * k)), PLAYER_COLORS[slot], -1)
         label = f"P{slot + 1} {score}"
-        (tw, _), _ = cv2.getTextSize(label, FONT, 0.5, 1)
-        text(canvas, label, cx - tw // 2, top - 22, 0.5, PLAYER_COLORS[slot])
+        (tw, _), _ = cv2.getTextSize(label, FONT, 0.5 * k, 1)
+        text(canvas, label, cx - tw // 2, top - int(22 * k), 0.5 * k, PLAYER_COLORS[slot])
 
 
 def text(canvas: np.ndarray, s: str, x: int, y: int, scale: float = 0.45, color=(255, 255, 255), thickness: int = 1):

@@ -16,8 +16,8 @@ def test_fit_exact_upscale_center_and_crop():
     assert not c[:, 0].any() and not c[:, 7].any() and np.array_equal(c[:, 1:7], up)
     small = fit(np.ones((4, 4, 3), np.uint8), 2, 2)  # too big: center crop, never shrink
     assert small.shape == (2, 2, 3) and small.all()
-    elbirdo = fit(np.ones((32, 768, 3), np.uint8), 768, 64)  # 768x32 on 768x64: scale 1, centered vertically
-    assert not elbirdo[:16].any() and elbirdo[16:48].all() and not elbirdo[48:].any()
+    small = fit(np.ones((32, 768, 3), np.uint8), 768, 64)  # 768x32 on 768x64: scale 1, centered vertically
+    assert not small[:16].any() and small[16:48].all() and not small[48:].any()
 
 
 def recv_frame(rx):

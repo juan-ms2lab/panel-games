@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from panel_games.games import REGISTRY, pick_size, pad
-from panel_games.games import elbirdo as fp
+from panel_games.games import resurrection as fp
 
 DT = 1 / 60
 
@@ -15,8 +15,8 @@ def bot(g):
 
 
 @pytest.mark.parametrize("h", [32, 64, 128])
-def test_elbirdo_plays_and_renders(h):
-    g = fp.ElBirdo(768, h, seed=3)
+def test_resurrection_plays_and_renders(h):
+    g = fp.Resurrection(768, h, seed=3)
     cv = np.zeros((h, 768, 3), np.uint8)
     seen, prev = set(), 0
     for i in range(60 * 40):
@@ -35,7 +35,7 @@ def test_elbirdo_plays_and_renders(h):
 
 
 def test_intro_and_underworld_render_at_64():
-    g = fp.ElBirdo(768, 64, seed=1)
+    g = fp.Resurrection(768, 64, seed=1)
     cv = np.zeros((64, 768, 3), np.uint8)
     for _ in range(int(6 * 60)):  # through the melt and the rise of RESURRECTION
         g.update(DT, [0])
@@ -50,19 +50,19 @@ def test_intro_and_underworld_render_at_64():
     assert (under[:, 0] > under[:, 2]).mean() > 0.9  # red underworld with fire columns
     utop, ubot = g._hole()
     assert 32 < utop < ubot < 64
-    g.y = 45.0  # drop into the underworld: skeleton birdo
+    g.y = 45.0  # drop into the underworld: skeleton bird
     g.update(DT, [0])
     assert g.was_under
 
 
 def test_single_display_has_no_underworld():
-    g = fp.ElBirdo(768, 32)
+    g = fp.Resurrection(768, 32)
     assert g.split == 32 and g.k == 1
 
 
 def test_pause_resume_and_stage_select():
-    g = fp.ElBirdo(768, 64)
-    fp.ElBirdo.record["unlocked"] = 3
+    g = fp.Resurrection(768, 64)
+    fp.Resurrection.record["unlocked"] = 3
     g.update(DT, [pad.RIGHT])
     assert g.state == "ready" and g.stage == 1
     g.update(DT, [0])
@@ -77,11 +77,11 @@ def test_pause_resume_and_stage_select():
     assert g.state == "play"
     g.update(DT, [None])  # player left
     assert g.state == "paused"
-    fp.ElBirdo.record.update(best=0, unlocked=1)
+    fp.Resurrection.record.update(best=0, unlocked=1)
 
 
 def test_falling_kills_and_loses_a_life():
-    g = fp.ElBirdo(768, 32)
+    g = fp.Resurrection(768, 32)
     g.update(DT, [pad.A])
     g.update(DT, [0])
     g.update(DT, [pad.A])
@@ -91,8 +91,8 @@ def test_falling_kills_and_loses_a_life():
 
 
 def test_declared_sizes():
-    assert REGISTRY["elbirdo"] is fp.ElBirdo and REGISTRY["flap"].title == "Panel Flap"
-    assert pick_size(fp.ElBirdo, 768, 64) == (768, 64)
-    assert pick_size(fp.ElBirdo, 768, 32) == (768, 32)
-    assert pick_size(fp.ElBirdo, 1536, 256) == (768, 128)
+    assert REGISTRY["resurrection"] is fp.Resurrection and REGISTRY["flap"].title == "Panel Flap"
+    assert pick_size(fp.Resurrection, 768, 64) == (768, 64)
+    assert pick_size(fp.Resurrection, 768, 32) == (768, 32)
+    assert pick_size(fp.Resurrection, 1536, 256) == (768, 128)
     assert pick_size(REGISTRY["platformer"], 768, 64) is None

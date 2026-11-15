@@ -6,9 +6,9 @@ A game may also declare `bezel` settings (see bezel.py). Both can be overridden 
 
     [default.bezel]          # every game
     aspect = "16:9"
-    [elbirdo]                # one game, by id
+    [resurrection]                # one game, by id
     size = [768, 64]
-    [elbirdo.bezel]
+    [resurrection.bezel]
     colors = ["#141022", "#000000"]
 """
 
@@ -16,7 +16,7 @@ from .. import bezel as bz
 from .bomber import Bombers
 from .chomp import Chomp
 from .flap import Flap
-from .elbirdo import ElBirdo
+from .resurrection import Resurrection
 from .hockey import Hockey
 from .hop import Hop
 from .pad import PAD
@@ -27,7 +27,7 @@ from .sweep import Sweep
 from .trivia import Trivia
 from .tug import Tug
 
-REGISTRY = {g.id: g for g in (Platformer, Hop, Flap, ElBirdo, Chomp, Bombers, Sweep, Trivia, Sketch, Tug, Hockey, Pong)}
+REGISTRY = {g.id: g for g in (Platformer, Hop, Flap, Resurrection, Chomp, Bombers, Sweep, Trivia, Sketch, Tug, Hockey, Pong)}
 
 
 def sizes(game, conf=None) -> list[tuple[int, int]]:

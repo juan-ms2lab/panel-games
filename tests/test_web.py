@@ -62,12 +62,12 @@ def test_games_too_big_for_the_target_are_unavailable_not_a_crash():
     try:
         games = {g["id"]: g for g in json.loads(api("GET", "/api/games")[1])}
         assert not games["platformer"]["available"] and games["platformer"]["size"] is None
-        assert games["elbirdo"]["available"] and games["elbirdo"]["size"] == "768x64"
+        assert games["resurrection"]["available"] and games["resurrection"]["size"] == "768x64"
         status, body, _ = api("POST", "/api/game/start", {"id": "platformer"})
         assert status == 400 and b"768x128" in body
         assert json.loads(api("GET", "/api/status")[1])["game"] is None
-        assert api("POST", "/api/game/start", {"id": "elbirdo"})[0] == 200
-        assert wait_for(lambda: json.loads(api("GET", "/api/status")[1])["game"]["id"] == "elbirdo")
+        assert api("POST", "/api/game/start", {"id": "resurrection"})[0] == 200
+        assert wait_for(lambda: json.loads(api("GET", "/api/status")[1])["game"]["id"] == "resurrection")
     finally:
         host.stop()
         srv.shutdown()

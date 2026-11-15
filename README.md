@@ -7,7 +7,7 @@ size, and the server pushes each frame to one or more outputs:
   colorlight-driver (the fork of Austin's driver) driving Colorlight 5A-75B panels;
 - a **screen** page (`/screen`) for any TV, monitor or laptop browser.
 
-The games (everything except El Birdo) come from Austin's
+The games (everything except Panel Flap Resurrection) come from Austin's
 [Colorlight-LED-Panel-Drivers](https://github.com/Austinrocket/Colorlight-LED-Panel-Drivers) (`ledpanels`),
 extracted here with their controller page, player slots, rate limits and tests. Hence the GPLv3 license.
 
@@ -45,8 +45,8 @@ uv run panel-games serve --ddp <pi-ip> --target 768x64
 `--target` must match the driver's canvas (768x64 for two stacked 768x32 strips). The game canvas is mapped onto
 the target by the sender: the largest whole-number nearest-neighbour upscale that fits, centered (scale 1 when
 the sizes match). A game larger than the target is center-cropped, never shrunk, but in practice it cannot be
-started: the catalog marks it unavailable for that target. On 768x64 that leaves El Birdo; Austin's
-games all need 768x128.
+started: the catalog marks it unavailable for that target. On 768x64 that leaves Panel Flap Resurrection and
+Panel Hop (which has a 768x64 layout); Austin's other games need 768x128.
 
 ## Bezel
 
@@ -54,7 +54,7 @@ The screen output draws a bezel: the graphic around and between the game's pictu
 gradient plus a repeating pattern), so it fits any size:
 
 - **Strip gaps:** `strip_height` cuts the picture into strips of that many rows (the physical LED strip height)
-  with `gap * strip_height` rows of bezel between them, so the TV looks like the real strips. El Birdo uses
+  with `gap * strip_height` rows of bezel between them, so the TV looks like the real strips. Panel Flap Resurrection uses
   32-row strips, a 1/5 gap (6 rows) and full width on a dark gradient, so a 768x64 game shows as 768x70.
 - **Letterboxing:** `aspect = "16:9"` pads the screen frame with bezel to that ratio instead of black bars.
 - **On the panels:** strip gaps are never sent by DDP (the real strips have their own). With `ddp = true` the
@@ -84,10 +84,10 @@ server with an error. See `panel-games.example.toml`:
 [default.bezel]
 aspect = "16:9"            # letterbox every game on the TV
 
-[elbirdo]
+[resurrection]
 size = [768, 64]           # always the two-strip version
 
-[elbirdo.bezel]
+[resurrection.bezel]
 colors = ["#141022", "#000000"]
 pattern = "dots"
 ```
@@ -99,10 +99,10 @@ canvas, a tap button, a touch pad). Each phone keeps one player slot, and a game
 ends and blanks the outputs. Multiplayer games wait in a lobby until the **host presses START** on their phone.
 The host is the first player to join (if they leave, the next in line). Anyone joining mid-round plays the next one.
 
-- **El Birdo** (768x32, 768x64 or 768x128): single player. The screen is static: the bird flies left to
+- **Panel Flap Resurrection** (768x32, 768x64 or 768x128): single player. The screen is static: the bird flies left to
   right, each level is one screen of pipes, 3 levels per stage, 16 themed stages (moving gaps, coins, darkness,
   flipped gravity, wind, low gravity) then endless. 3 lives, coins give +5 and every 20 an extra life. On a
-  64-pixel-tall (or taller) canvas the bottom half is the underworld: drop down and you become skeleton birdo,
+  64-pixel-tall (or taller) canvas the bottom half is the underworld: drop down and you become skeleton bird,
   dodging magma pillars and hanging fire whose shared hole moves in sync (+2 per column passed down there). A or
   Up flaps, START pauses, Left/Right pick the starting stage (among the ones unlocked) before the first flap.
 - **Panel Run**: an original one-screen platformer (96x16 tiles of 8 pixels, the whole level always visible).
@@ -128,6 +128,9 @@ The host is the first player to join (if they leave, the next in line). Anyone j
   swamp, desert, snow, volcano, then a huge multilane city highway) to the finish pond. Difficulty escalates toward
   the end, there are checkpoints and 3 lives, and cars flash a warning before entering the screen. The test suite
   includes a bot that proves every stretch is crossable (`LED_SLOW_TESTS=1` runs extra seeds).
+  On 768x64 (two stacked strips) it uses the same lanes and biomes with 7 rows instead of 14 and an 8-pixel HUD;
+  with half the room to dodge, city traffic is 65% as dense and water moves at half speed, which the same bot
+  crosses on every seed tried (24 of 24).
 - **Panel Sketch**: Pictionary for up to 8 players. The server picks the drawer, who draws a secret word on their
   phone while everyone else types guesses. Every player draws once per cycle (host picks 1 to 3 cycles with the
   arrows). Faster correct guesses score more, the drawer earns a bonus, and letters are revealed as time runs out.

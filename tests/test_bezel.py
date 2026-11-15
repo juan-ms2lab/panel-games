@@ -3,7 +3,7 @@ import pytest
 
 from panel_games import bezel as bz
 from panel_games import games
-from panel_games.games.elbirdo import ElBirdo
+from panel_games.games.resurrection import Resurrection
 from panel_games.outputs import DDPOutput, ScreenOutput, fit
 
 
@@ -51,23 +51,23 @@ def test_bad_settings_rejected(bad):
         bz.config(bad)
 
 
-def test_elbirdo_dark_bezel_and_per_game_config():
-    c = games.bezel(ElBirdo)
+def test_resurrection_dark_bezel_and_per_game_config():
+    c = games.bezel(Resurrection)
     assert c["strip_height"] == 32 and max(bz.fill(768, 70, c)[:, :, :].reshape(-1)) < 60  # dark
-    conf = {"default": {"bezel": {"aspect": "16:9"}}, "elbirdo": {"size": [768, 64], "bezel": {"gap": 0.5}}}
+    conf = {"default": {"bezel": {"aspect": "16:9"}}, "resurrection": {"size": [768, 64], "bezel": {"gap": 0.5}}}
     games.check_config(conf)
-    c = games.bezel(ElBirdo, conf)
+    c = games.bezel(Resurrection, conf)
     assert c["aspect"] == "16:9" and c["gap"] == 0.5 and c["strip_height"] == 32
-    assert games.pick_size(ElBirdo, 768, 128, conf) == (768, 64)
-    for bad in ({"nogame": {}}, {"elbirdo": {"speed": 2}}, {"elbirdo": {"size": [768]}},
-                {"elbirdo": {"bezel": {"pattern": "plaid"}}}):
+    assert games.pick_size(Resurrection, 768, 128, conf) == (768, 64)
+    for bad in ({"nogame": {}}, {"resurrection": {"speed": 2}}, {"resurrection": {"size": [768]}},
+                {"resurrection": {"bezel": {"pattern": "plaid"}}}):
         with pytest.raises(ValueError):
             games.check_config(bad)
 
 
 def test_outputs_use_bezel():
     s = ScreenOutput()
-    s.show(two_strips(), games.bezel(ElBirdo))
+    s.show(two_strips(), games.bezel(Resurrection))
     assert s.frame.shape == (70, 768, 3)
     c = bz.config({"ddp": True})
     small = np.full((32, 768, 3), 255, np.uint8)

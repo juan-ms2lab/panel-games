@@ -1,11 +1,11 @@
-"""El Birdo: single-player elbirdo for a wide, short strip (768x32, or taller: everything scales by h/32).
+"""Panel Flap Resurrection: single-player flap game for a wide, short strip (768x32, or taller: everything scales by h/32).
 
 The screen is static: the bird flies left to right, and each level is one screen-width of pipes. 16 themed
 stages of LEVELS_PER_STAGE levels, then endless. Stages introduce moving gaps, coins, darkness, flipped
 gravity, wind and low gravity. Losing a life restarts the current level.
 
 With two stacked displays (h >= 64) the bottom half is the underworld: the bird can drop down and becomes
-skeleton birdo; obstacles there are magma pillars and hanging fire whose flames grow and shrink in sync,
+skeleton bird; obstacles there are magma pillars and hanging fire whose flames grow and shrink in sync,
 slowly moving the hole.
 
 Ported from the standalone original (bytearray canvas) to the games interface: update(dt, pads) and
@@ -70,7 +70,7 @@ SKEL = [".www.", "wwkrw", "wwwgg", ".w.w."]
 SKEL_FLAP = [".www.", "lwkrw", "wwwgg", ".w.w."]
 SKEL_PAL = {"w": (225, 225, 210), "k": (0, 0, 0), "r": (255, 40, 0), "g": (150, 150, 140), "l": (255, 255, 255)}
 FLAME = [(255, 255, 160), (255, 220, 60), (255, 150, 20), (230, 70, 0), (160, 20, 0)]
-TITLE, TITLE2 = "EL BIRDO", "RESURRECTION"
+TITLE, TITLE2 = "PANEL FLAP", "RESURRECTION"
 MELT_AT, RISE_AT, PROMPT_AT = 3.0, 4.5, 7.0  # intro timeline, seconds
 UNDER_BONUS = 2  # extra points per column passed in the underworld
 
@@ -174,11 +174,11 @@ class Pipe:
         return min(hi, max(lo, c))
 
 
-class ElBirdo:
-    id = "elbirdo"
-    title = "El Birdo"
+class Resurrection:
+    id = "resurrection"
+    title = "Panel Flap Resurrection"
     description = ("One bird, 16 themed stages then endless: moving gaps, coins, darkness, flipped gravity, wind. "
-                   "On a 64-pixel-tall display, drop into the underworld as skeleton birdo between fire columns.")
+                   "On a 64-pixel-tall display, drop into the underworld as skeleton bird between fire columns.")
     max_players = 1
     size = [(768, 128), (768, 64), (768, 32)]
     # screen bezel: the two 32-row strips with a 1/5-strip gap, full width, on a dark gradient so they stand out
@@ -189,7 +189,7 @@ class ElBirdo:
 
     def __init__(self, width: int, height: int, seed=None):
         if width < 128 or height < 32:
-            raise ValueError("El Birdo needs at least 128x32")
+            raise ValueError("Panel Flap Resurrection needs at least 128x32")
         self.width, self.height = width, height
         self.w, self.h = width, height
         self.rng = random.Random(seed)
@@ -509,7 +509,7 @@ class ElBirdo:
         cv.a[ny[keep], xs[keep]] = col[keep]
 
     def _draw_rise(self, cv, t):
-        """RESURRECTION rises out of the lava with skeleton birdo on each side."""
+        """RESURRECTION rises out of the lava with skeleton bird on each side."""
         if t < RISE_AT:
             return
         w, h, sp, k = self.w, self.h, self.split, self.k

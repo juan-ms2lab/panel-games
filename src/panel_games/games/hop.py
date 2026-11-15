@@ -2,6 +2,9 @@
 
 Lanes are columns, so everyone hops left to right across the long side. Traffic and platforms move up and
 down. The biomes get harder towards the end, finishing with a huge city highway.
+
+Two sizes: 768x128 (14 rows under a 16-pixel HUD) and 768x64 for two stacked 768x32 strips (7 rows under an
+8-pixel HUD). Same tiles, lanes and biomes; only the number of rows changes.
 """
 
 import math
@@ -14,9 +17,13 @@ from .base import PLAYER_COLORS, Lobby, center_text, draw_podium, text
 from .pad import DOWN, LEFT, RIGHT, UP
 
 T = 8
-GW, GH = 96, 14
-OY = 16
-P = GH + 12                      # length of each lane's looping belt, in rows
+GW, GH = 96, 14                  # lanes, rows (768x128 layout)
+OY = 16                          # HUD height in pixels
+SMALL_GH, SMALL_OY = 7, 8        # 768x64 layout
+BELT_EXTRA = 12                  # each lane's looping belt is gh + BELT_EXTRA rows long
+P = GH + BELT_EXTRA              # belt length on the 768x128 layout
+CITY_SMALL = 0.65                # city traffic density on the 768x64 layout, relative to 768x128
+WATER_SMALL = 0.5               # water speed on the 768x64 layout, relative to 768x128
 MARGIN = 6                       # belt position 0 sits this many rows above the screen
 HOP_T, HOP_GAP = 0.10, 0.065   # a full hop-and-recover cycle is 10 frames at 60 fps
 LIVES = 3
@@ -37,8 +44,9 @@ def turtle_state(offset: float, t: float) -> str:
 
 
 class Lane:
-    def __init__(self, kind: str, biome: str, direction: int = 1, speed: float = 0.0, objs=(), trains=()):
+    def __init__(self, kind: str, biome: str, direction: int = 1, speed: float = 0.0, objs=(), trains=(), gh: int = GH):
         self.kind, self.biome, self.dir, self.speed = kind, biome, direction, speed
+        self.gh, self.p = gh, gh + BELT_EXTRA
         self.objs = list(objs)       # (offset, length, style)
         self.trains = list(trains)   # start times of trains (rail lanes)
 
@@ -46,15 +54,15 @@ class Lane:
         """Objects at time t as (row start, row end, style, offset); only those on screen unless offscreen."""
         out = []
         for off, length, style in self.objs:
-            y0 = (off + self.dir * self.speed * t) % P - MARGIN
-            for y in (y0, y0 - P):
-                if offscreen or (y < GH and y + length > 0):
+            y0 = (off + self.dir * self.speed * t) % self.p - MARGIN
+            for y in (y0, y0 - self.p):
+                if offscreen or (y < self.gh and y + length > 0):
                     out.append((y, y + length, style, off))
         if self.kind == "rail":
             for ts in self.trains:
                 phase = t - ts
-                if 0 <= phase <= (GH + TRAIN_LEN) / TRAIN_SPEED:
-                    y0 = -TRAIN_LEN + phase * TRAIN_SPEED if self.dir > 0 else GH - phase * TRAIN_SPEED
+                if 0 <= phase <= (self.gh + TRAIN_LEN) / TRAIN_SPEED:
+                    y0 = -TRAIN_LEN + phase * TRAIN_SPEED if self.dir > 0 else self.gh - phase * TRAIN_SPEED
                     out.append((y0, y0 + TRAIN_LEN, "train", 0.0))
         return out
 
@@ -67,11 +75,11 @@ class Lane:
             return None
         reach = self.speed * horizon
         for off, length, _ in self.objs:
-            y0 = (off + self.dir * self.speed * t) % P - MARGIN
-            for y in (y0, y0 - P):
+            y0 = (off + self.dir * self.speed * t) % self.p - MARGIN
+            for y in (y0, y0 - self.p):
                 if self.dir > 0 and -reach < y + length <= 0:
                     return "top"
-                if self.dir < 0 and GH <= y < GH + reach:
+                if self.dir < 0 and self.gh <= y < self.gh + reach:
                     return "bottom"
         return None
 
@@ -86,8 +94,8 @@ class Lane:
         return any(ts - TRAIN_WARN <= t < ts for ts in self.trains)
 
 
-def _spread(rng, lengths, gap_min, jitter=(0.7, 1.3)):
-    """Offsets for objects of the given lengths looping on a belt, with roughly even random gaps."""
+def _spread(rng, lengths, gap_min, P, jitter=(0.7, 1.3)):
+    """Offsets for objects of the given lengths looping on a belt of P rows, with roughly even random gaps."""
     n = len(lengths)
     free = P - sum(lengths)
     weights = [rng.uniform(*jitter) for _ in range(n)]
@@ -99,7 +107,8 @@ def _spread(rng, lengths, gap_min, jitter=(0.7, 1.3)):
     return offsets
 
 
-def road_lane(rng, biome, direction, kinds, cover, gap_min, speeds):
+def road_lane(rng, biome, direction, kinds, cover, gap_min, speeds, gh=GH):
+    P = gh + BELT_EXTRA
     lengths, styles = [], []
     while True:
         style = rng.choice(kinds)
@@ -109,11 +118,12 @@ def road_lane(rng, biome, direction, kinds, cover, gap_min, speeds):
         lengths.append(length)
         styles.append(style)
     speed = rng.uniform(*speeds)
-    objs = [(o, ln, st) for o, ln, st in zip(_spread(rng, lengths, gap_min), lengths, styles)]
-    return Lane("road", biome, direction, speed, objs)
+    objs = [(o, ln, st) for o, ln, st in zip(_spread(rng, lengths, gap_min, P), lengths, styles)]
+    return Lane("road", biome, direction, speed, objs, gh=gh)
 
 
-def water_lane(rng, biome, direction, styles, cover, speeds, length_range):
+def water_lane(rng, biome, direction, styles, cover, speeds, length_range, gh=GH):
+    P = gh + BELT_EXTRA
     lengths, kinds = [], []
     while sum(lengths) / P < cover:
         style = rng.choice(styles)
@@ -122,35 +132,37 @@ def water_lane(rng, biome, direction, styles, cover, speeds, length_range):
             break
         lengths.append(length)
         kinds.append(style)
-    objs = [(o, ln, st) for o, ln, st in zip(_spread(rng, lengths, 0.6, (0.75, 1.25)), lengths, kinds)]
-    return Lane("water", biome, direction, rng.uniform(*speeds), objs)
+    objs = [(o, ln, st) for o, ln, st in zip(_spread(rng, lengths, 0.6, P, (0.75, 1.25)), lengths, kinds)]
+    return Lane("water", biome, direction, rng.uniform(*speeds), objs, gh=gh)
 
 
-def rail_lane(rng, direction):
+def rail_lane(rng, direction, gh=GH):
     times, t = [], rng.uniform(2.0, 7.0)
     while t < 400:
         times.append(t)
         t += rng.uniform(6.0, 10.0)
-    return Lane("rail", "rail", direction, 0.0, (), times)
+    return Lane("rail", "rail", direction, 0.0, (), times, gh=gh)
 
 
-def build_level(rng: random.Random) -> list[Lane]:
+def build_level(rng: random.Random, gh: int = GH) -> list[Lane]:
     lanes: list[Lane] = []
     flip = [1]
 
     def safe(biome, n=1):
-        lanes.extend(Lane("safe", biome) for _ in range(n))
+        lanes.extend(Lane("safe", biome, gh=gh) for _ in range(n))
 
     def next_dir(block, i):
         return 1 if (i // block) % 2 == 0 else -1
 
     def roads(n, biome, kinds, cover, gap_min, speeds, block=1, first=1):
         for i in range(n):
-            lanes.append(road_lane(rng, biome, first * next_dir(block, i), kinds, cover, gap_min, speeds))
+            lanes.append(road_lane(rng, biome, first * next_dir(block, i), kinds, cover, gap_min, speeds, gh))
 
     def waters(n, biome, styles, cover, speeds, lens, first=1):
+        if gh < GH:  # half the rows: a log carries you off screen twice as fast, so slow the water down
+            speeds = (speeds[0] * WATER_SMALL, speeds[1] * WATER_SMALL)
         for i in range(n):
-            lanes.append(water_lane(rng, biome, first * (1 if i % 2 == 0 else -1), styles, cover, speeds, lens))
+            lanes.append(water_lane(rng, biome, first * (1 if i % 2 == 0 else -1), styles, cover, speeds, lens, gh))
 
     safe("start", 3)
     roads(6, "country", ("car", "car", "moto"), 0.14, 3.5, (1.8, 2.8))
@@ -159,10 +171,10 @@ def build_level(rng: random.Random) -> list[Lane]:
     safe("bank")
     for kind in "bbrbbrsbbrbbrb":
         if kind == "b":
-            lanes.append(road_lane(rng, "desert", flip[0], ("boulder",), 0.12, 3.0, (2.8, 4.2)))
+            lanes.append(road_lane(rng, "desert", flip[0], ("boulder",), 0.12, 3.0, (2.8, 4.2), gh))
             flip[0] = -flip[0]
         elif kind == "r":
-            lanes.append(rail_lane(rng, flip[0]))
+            lanes.append(rail_lane(rng, flip[0], gh))
             flip[0] = -flip[0]
         else:
             safe("rock")
@@ -176,29 +188,38 @@ def build_level(rng: random.Random) -> list[Lane]:
     # Four six-lane highway blocks; each is busier and faster than the last. Tuned with a perfect-information
     # planner so every block can always be crossed, while still getting much harder than the biomes before it.
     city = [(0.25, 2.6, (3.4, 4.6)), (0.27, 2.5, (3.8, 5.0)), (0.29, 2.5, (4.0, 5.3)), (0.30, 2.4, (4.2, 5.5))]
+    city_kinds = ("car", "car", "truck", "bus", "moto")
+    if gh < GH:  # 7 rows leave little room to dodge: lighter traffic and no buses, re-tuned with the same planner
+        city = [(c * CITY_SMALL, g, s) for c, g, s in city]
+        city_kinds = ("car", "car", "truck", "moto")
     for block, (cover, gap, speeds) in enumerate(city):
-        roads(6, "city", ("car", "car", "truck", "bus", "moto"), cover, gap, speeds,
+        roads(6, "city", city_kinds, cover, gap, speeds,
               block=6, first=1 if block % 2 == 0 else -1)
         if block < 3:
             safe("barrier")
     safe("bank", 5)
-    lanes.extend(Lane("pond", "pond") for _ in range(GW - len(lanes)))
+    lanes.extend(Lane("pond", "pond", gh=gh) for _ in range(GW - len(lanes)))
     assert len(lanes) == GW
     return lanes
+
+
+def start_row(slot: int, gh: int) -> float:
+    """Spread the four players over the rows: 2, 5, 8, 11 on 14 rows; 0, 2, 4, 6 on 7."""
+    return float(2 + slot * 3 if gh >= GH else slot * (gh - 1) // 3)
 
 
 class Hopper:
     w = 0.7
 
-    def __init__(self, slot: int):
-        self.slot, self.lives = slot, LIVES
+    def __init__(self, slot: int, gh: int = GH):
+        self.slot, self.lives, self.gh = slot, LIVES, gh
         self.max_col, self.cp = 0, 0
         self.place = 0
         self.finished = False
         self.reset_position(0)
 
     def reset_position(self, col):
-        self.x, self.y = float(col), float(2 + self.slot * 3)
+        self.x, self.y = float(col), start_row(self.slot, self.gh)
         self.hop = None
         self.alive, self.invuln, self.cool, self.death_t = True, 1.6, 0.0, 0.0
         self.face, self.cause = (1, 0), ""
@@ -209,13 +230,14 @@ class Hop:
     title = "Panel Hop"
     description = "Hop across the whole display: country road, rivers, a railway desert, lava, and a huge city highway to the finish pond."
     max_players = 4
-    size = (768, 128)
+    size = [(768, 128), (768, 64)]
     controls = "Hold or tap the D-pad to hop. Ride logs over water. Dodge everything else"
 
     def __init__(self, width: int, height: int, seed=None):
-        if width < GW * T or height < OY + GH * T:
-            raise ValueError(f"Panel Hop needs a {GW * T}x{OY + GH * T} display")
+        if width < GW * T or height < SMALL_OY + SMALL_GH * T:
+            raise ValueError(f"Panel Hop needs a {GW * T}x{SMALL_OY + SMALL_GH * T} display or larger")
         self.width, self.height = width, height
+        self.gh, self.oy = (GH, OY) if height >= OY + GH * T else (SMALL_GH, SMALL_OY)
         self.rng = random.Random(seed)
         self.t = 0.0
         self.lobby = Lobby()
@@ -228,14 +250,14 @@ class Hop:
         self.state = "lobby"
         self.lobby.reset()
         self.joined = set(joined or ())
-        self.lanes = build_level(self.rng)
+        self.lanes = build_level(self.rng, self.gh)
         self.hoppers: dict[int, Hopper] = {}
         self.finished: list[int] = []
         self.play_t, self.deadline, self.timer, self.result = 0.0, TIME_LIMIT, 0.0, {}
         self._build_bg()
 
     def _start(self, roster):
-        self.hoppers = {s: Hopper(s) for s in sorted(roster)}
+        self.hoppers = {s: Hopper(s, self.gh) for s in sorted(roster)}
         self.state, self.play_t = "play", 0.0
 
     def info(self) -> dict:
@@ -309,12 +331,12 @@ class Hop:
                 if v is None:
                     return self._die(h, "drown")
                 h.y += v * dt
-                if h.y < -0.45 or h.y > GH - 0.55:
+                if h.y < -0.45 or h.y > self.gh - 0.55:
                     return self._die(h, "swept")
             d = next((v for bit, v in KEY_DIRS if keys & bit), None)
             if d and h.cool <= 0:
                 nx, ny = int(round(h.x)) + d[0], h.y + d[1]
-                if 0 <= nx < GW and 0 <= ny <= GH - 1:
+                if 0 <= nx < GW and 0 <= ny <= self.gh - 1:
                     h.hop, h.face, h.cool = [h.x, h.y, float(nx), ny, 0.0], d, HOP_T + HOP_GAP
         if h.alive and h.invuln <= 0 and not h.finished:
             for c in range(int(math.floor(h.x + 0.15)), int(math.floor(h.x + 0.85)) + 1):
@@ -327,7 +349,7 @@ class Hop:
         lane = self.lanes[col]
         h.x = float(col)
         if lane.kind != "water":
-            h.y = float(min(GH - 1, max(0, round(h.y))))
+            h.y = float(min(self.gh - 1, max(0, round(h.y))))
         h.max_col = max(h.max_col, col)
         if lane.kind == "safe":
             h.cp = max(h.cp, col)
@@ -340,7 +362,7 @@ class Hop:
         h.finished = True
         self.finished.append(h.slot)
         h.place = len(self.finished)
-        h.x, h.y = POND_START + 1 + (h.place - 1) * 1.8, float(2 + h.slot * 3)
+        h.x, h.y = POND_START + 1 + (h.place - 1) * 1.8, start_row(h.slot, self.gh)
         if h.place == 1:
             self.deadline = min(self.deadline, self.play_t + LAST_CALL)
 
@@ -363,7 +385,7 @@ class Hop:
     # ---- drawing
 
     def _build_bg(self):
-        bg = np.zeros((GH * T, GW * T, 3), np.uint8)
+        bg = np.zeros((self.gh * T, GW * T, 3), np.uint8)
         for c, lane in enumerate(self.lanes):
             x = c * T
             col = bg[:, x : x + T]
@@ -372,7 +394,7 @@ class Hop:
                 col[:] = {"start": (40, 150, 60), "median": (35, 130, 55), "bank": (45, 150, 70), "oasis": (190, 165, 95),
                           "rock": (95, 95, 105), "barrier": (110, 110, 118)}[b]
                 if b in ("start", "median", "bank"):
-                    for y in range(3, GH * T, 11):
+                    for y in range(3, self.gh * T, 11):
                         col[y : y + 2, (y * 7 + c * 5) % 6 : (y * 7 + c * 5) % 6 + 2] = (255, 230, 90) if (y + c) % 2 else (255, 130, 190)
                 if b == "barrier":
                     col[:, 3:5] = (200, 200, 60)
@@ -381,35 +403,34 @@ class Hop:
                 prev = self.lanes[c - 1] if c else None
                 if prev is not None and prev.kind == "road":
                     line = (235, 200, 40) if prev.dir != lane.dir else (210, 210, 215)
-                    for y in range(0, GH * T, 8):
+                    for y in range(0, self.gh * T, 8):
                         col[y : y + 5, 0] = line
             elif lane.kind == "rail":
                 col[:] = (205, 170, 105)
                 col[:, 1] = col[:, 6] = (120, 120, 130)
-                for y in range(0, GH * T, 6):
+                for y in range(0, self.gh * T, 6):
                     col[y : y + 2, 0:8] = (120, 80, 40)
             elif lane.kind == "water":
                 col[:] = {"stream": (35, 105, 205), "lava": (150, 35, 10), "canal": (20, 75, 120)}[b]
                 spark = (255, 140, 30) if b == "lava" else (90, 160, 240)
-                for y in range(2, GH * T, 9):
-                    col[(y + c * 3) % (GH * T), (c * 5 + y) % 7] = spark
+                for y in range(2, self.gh * T, 9):
+                    col[(y + c * 3) % (self.gh * T), (c * 5 + y) % 7] = spark
             else:  # pond
                 col[:] = (30, 140, 205)
-                for y in range(4, GH * T, 14):
+                for y in range(4, self.gh * T, 14):
                     cv2.circle(bg, (x + 2 + (y + c * 5) % 5, y + (c % 3) * 2), 3, (40, 170, 70), -1)
-        for y in range(0, GH * T, 8):  # checkered finish line at the edge of the pond
+        for y in range(0, self.gh * T, 8):  # checkered finish line at the edge of the pond
             bg[y : y + 4, POND_START * T : POND_START * T + 4] = (240, 240, 240)
             bg[y + 4 : y + 8, POND_START * T + 4 : POND_START * T + 8] = (240, 240, 240)
         self.bg = bg
 
-    @staticmethod
-    def _rect(canvas, x, y, w, h, color):
-        x0, y0, x1, y1 = max(x, 0), max(y, OY), min(x + w, canvas.shape[1]), min(y + h, OY + GH * T)
+    def _rect(self, canvas, x, y, w, h, color):
+        x0, y0, x1, y1 = max(x, 0), max(y, self.oy), min(x + w, canvas.shape[1]), min(y + h, self.oy + self.gh * T)
         if x0 < x1 and y0 < y1:
             canvas[y0:y1, x0:x1] = color
 
     def _draw_object(self, canvas, c, a, b, style, off, direction, t):
-        x, y, h = c * T, OY + int(round(a * T)), int(round((b - a) * T))
+        x, y, h = c * T, self.oy + int(round(a * T)), int(round((b - a) * T))
         r = self._rect
         if style in ("car", "bus", "truck", "moto"):
             color = (250, 205, 40) if style == "bus" else (150, 150, 160) if style == "truck" else CAR_COLORS[int(off * 7) % len(CAR_COLORS)]
@@ -449,7 +470,7 @@ class Hop:
                 r(canvas, x + 3, y + k, 2, 2, (255, 230, 120))
 
     def _draw_hopper(self, canvas, h: Hopper, bob: float = 0.0):
-        px, py = int((h.x + 0.5) * T), int(OY + (h.y + 0.5) * T + bob)
+        px, py = int((h.x + 0.5) * T), int(self.oy + (h.y + 0.5) * T + bob)
         color = PLAYER_COLORS[h.slot]
         if not h.alive:
             cv2.circle(canvas, (px, py), 3, tuple(c // 3 for c in color), -1)
@@ -469,15 +490,15 @@ class Hop:
         if self.state == "over" and not self.result["solo"]:
             return draw_podium(canvas, self.result["ranking"], self.t)
         canvas[:] = 0
-        canvas[OY : OY + GH * T, : GW * T] = self.bg
+        canvas[self.oy : self.oy + self.gh * T, : GW * T] = self.bg
         t = self.play_t if self.state in ("play", "over") else self.t
         for c, lane in enumerate(self.lanes):
             if lane.kind == "rail" and lane.warning(t) and int(t * 6) % 2:
-                self._rect(canvas, c * T, OY, T, 4, (255, 40, 40))
-                self._rect(canvas, c * T, OY + GH * T - 4, T, 4, (255, 40, 40))
+                self._rect(canvas, c * T, self.oy, T, 4, (255, 40, 40))
+                self._rect(canvas, c * T, self.oy + self.gh * T - 4, T, 4, (255, 40, 40))
             edge = lane.entering(t)
             if edge and int(t * 8) % 2:  # flashing arrow where a vehicle is about to appear
-                y = OY if edge == "top" else OY + GH * T - 3
+                y = self.oy if edge == "top" else self.oy + self.gh * T - 3
                 self._rect(canvas, c * T + 1, y, 6, 3, (255, 70, 40))
                 self._rect(canvas, c * T + 3, y + (0 if edge == "top" else 1), 2, 2, (255, 230, 60))
             for a, b, style, off in lane.intervals(t):
@@ -488,16 +509,19 @@ class Hop:
         for s, h in sorted(roster.items()):
             pct = int(100 * h.max_col / (POND_START))
             label = f"P{s + 1} {'x' * max(0, h.lives)} {'DONE' if h.finished else str(min(100, pct)) + '%'}"
-            text(canvas, label, 6 + s * 130, 13, 0.42, PLAYER_COLORS[s] if h.lives > 0 or h.finished else (110, 110, 110))
+            text(canvas, label, 6 + s * 130, self.oy - 3 if self.gh == GH else self.oy - 1, 0.42 if self.gh == GH else 0.27, PLAYER_COLORS[s] if h.lives > 0 or h.finished else (110, 110, 110))
         if self.state == "play":
             left = max(0, int(self.deadline - self.play_t))
-            text(canvas, f"TIME {left // 60}:{left % 60:02d}", self.width - 100, 13, 0.45, (255, 90, 90) if left < 15 else (255, 255, 255))
+            text(canvas, f"TIME {left // 60}:{left % 60:02d}", self.width - 100, self.oy - 3 if self.gh == GH else self.oy - 1, 0.45 if self.gh == GH else 0.27, (255, 90, 90) if left < 15 else (255, 255, 255))
         if self.state == "lobby":
-            canvas[OY:] = canvas[OY:] // 3
-            center_text(canvas, "PANEL HOP", 56, 1.0, (255, 230, 0))
-            center_text(canvas, "Cross every biome to the pond. Logs carry you over water.", 78, 0.5)
-            center_text(canvas, self.lobby.message, 102, 0.8, (120, 255, 120) if self.joined else (255, 255, 255))
+            canvas[self.oy:] = canvas[self.oy:] // 3
+            big = self.gh == GH  # 768x64: title on the top strip, the other two lines on the bottom one
+            center_text(canvas, "PANEL HOP", 56 if big else 22, 1.0 if big else 0.55, (255, 230, 0))
+            center_text(canvas, "Cross every biome to the pond. Logs carry you over water.", 78 if big else 44,
+                        0.5 if big else 0.3)
+            center_text(canvas, self.lobby.message, 102 if big else 59, 0.8 if big else 0.36,
+                        (120, 255, 120) if self.joined else (255, 255, 255))
         elif self.state == "over":
             canvas[:] = canvas // 3
             fin = self.result["finished"]
-            center_text(canvas, "MADE IT!" if fin else "GAME OVER", 70, 1.0, (120, 255, 120) if fin else (255, 80, 80))
+            center_text(canvas, "MADE IT!" if fin else "GAME OVER", 70 if self.gh == GH else 40, 1.0 if self.gh == GH else 0.7, (120, 255, 120) if fin else (255, 80, 80))
